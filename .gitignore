@@ -1,0 +1,33 @@
+# Go build outputs
+/pacman-tui
+/glimmer
+/bin/
+/dist/
+*.exe
+*.test
+*.out
+
+# Go workspace and vendored dependencies
+go.work
+go.work.sum
+/vendor/
+
+# Coverage and profiling artifacts
+coverage.out
+coverage.html
+*.prof
+
+# Editor and operating system files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Local environment and config
+.claude/settings.local.json
+.env
+.env.*
+!.env.example
+config.local.toml
