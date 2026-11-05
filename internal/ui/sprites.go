@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	fireflyGlyph = '◕'
+	fireflyGlyph = 'C'
 
 	legPhaseTicks  = 2 // ticks between leg positions
 	wingPhaseTicks = 1 // ticks between wing beats
@@ -78,7 +78,14 @@ func (c canvas) paintSprite(p maze.Point, s sprite, color rgb) {
 
 func (c canvas) paintRobot(s *game.Robot) {
 	tick := c.g.Tick()
-	c.paintSprite(s.Pos, robotSprite(robotFace(s, tick), tick, c.scale.large), robotColor(c.g, s))
+	color := robotColor(c.g, s)
+	c.paintSprite(s.Pos, robotSprite(robotFace(s, tick), tick, c.scale.large), color)
+	if c.scale.large {
+		x, y := c.position(s.Pos)
+		eyeColor := rgb{255, 255, 255}.fg().Bold(true)
+		c.f.set(x-1, y, '●', eyeColor)
+		c.f.set(x+1, y, '●', eyeColor)
+	}
 }
 
 func (c canvas) paintFirefly() {
@@ -123,35 +130,31 @@ func robotFace(s *game.Robot, tick int) pair {
 	}
 }
 
-// robotSprite draws a boxy robot with an antenna and arms that swing as it walks.
+// robotSprite draws a ghost with a rounded cap, eyes and a moving skirt.
 func robotSprite(face pair, tick int, large bool) sprite {
 	if !large {
-		return sprite{rows: []string{" G "}, mask: []string{"   "}}
+		return sprite{rows: []string{" ◉ "}, mask: []string{"   "}}
 	}
-	dome := " ▄█▄ "
+	feet := "▀▄▀▄▀"
+	bodyRow := "█████"
 	if (tick/legPhaseTicks)%2 == 1 {
-		dome = " ▄▀▄ "
+		feet = "▄▀▄▀▄"
+		bodyRow = "██ ██"
 	}
 	return sprite{
-		rows: []string{"     ", dome, " ◉ ◉ "},
+		rows: []string{" ▄█▄ ", bodyRow, feet},
 		mask: []string{"     ", "     ", "     "},
 	}
 }
 
-// fireflySprite draws a rounded body with beating wings. The lantern on the body
-// moves toward the direction of flight.
+// fireflySprite draws Pac-Man as a round, open mouth facing the direction of travel.
 func fireflySprite(heading maze.Dir, tick int, large bool) sprite {
-	face := '◕'
-	switch heading {
-	case maze.Left:
-		face = '◔'
-	case maze.Up:
-		face = '◒'
-	case maze.Down:
-		face = '◓'
+	mouth := fireflyGlyph
+	if tick%2 == 1 {
+		mouth = 'c'
 	}
 	if !large {
-		return sprite{rows: []string{" " + string(face) + " "}, mask: []string{"   "}}
+		return sprite{rows: []string{" " + string(mouth) + " "}, mask: []string{"   "}}
 	}
 	rows := [3][]rune{[]rune("     "), []rune("     "), []rune("     ")}
 	mask := [3][]rune{[]rune("     "), []rune("     "), []rune("     ")}
@@ -160,11 +163,11 @@ func fireflySprite(heading maze.Dir, tick int, large bool) sprite {
 	shape := [3]string{" bbb ", "bb   ", " bbb "} // mouth opens right
 	switch heading {
 	case maze.Left:
-		shape = [3]string{" bbb ", "   bb", " bbb "}
+		shape[1] = "   bb"
 	case maze.Up:
-		shape = [3]string{"  b  ", " bbb ", "bb bb"}
+		shape = [3]string{"bb bb", "bbbbb", " bbb "}
 	case maze.Down:
-		shape = [3]string{"bb bb", " bbb ", "  b  "}
+		shape = [3]string{" bbb ", "bbbbb", "bb bb"}
 	}
 	for y, row := range shape {
 		for x, cell := range row {
@@ -173,8 +176,8 @@ func fireflySprite(heading maze.Dir, tick int, large bool) sprite {
 			}
 		}
 	}
-	row, col := lanternCell(heading)
-	rows[row][col] = face
+	rowIndex, col := lanternCell(heading)
+	rows[rowIndex][col] = mouth
 	return sprite{
 		rows: []string{string(rows[0]), string(rows[1]), string(rows[2])},
 		mask: []string{string(mask[0]), string(mask[1]), string(mask[2])},

@@ -8,9 +8,9 @@ import (
 const (
 	sparkGlyph      = '·'
 	largeSparkGlyph = '·'
-	twinkleGlyph    = '·'
+	twinkleGlyph    = '✧'
 	nectarGlyph     = '●'
-	nectarAltGlyph  = '●'
+	nectarAltGlyph  = '◉'
 	denPatternGlyph = ' '
 	trailGlyph      = '·'
 
@@ -40,17 +40,17 @@ const (
 
 // wallJoints maps connections to the box-drawing character that joins them.
 var wallJoints = [16]rune{
-	0:                                        '▪',
+	0:                                        '█',
 	linkUp:                                   '╹',
 	linkRight:                                '╺',
 	linkDown:                                 '╻',
 	linkLeft:                                 '╸',
 	linkUp | linkDown:                        '┃',
 	linkLeft | linkRight:                     '━',
-	linkUp | linkRight:                       '┗',
-	linkRight | linkDown:                     '┏',
-	linkDown | linkLeft:                      '┓',
-	linkUp | linkLeft:                        '┛',
+	linkUp | linkRight:                       '╰',
+	linkRight | linkDown:                     '╭',
+	linkDown | linkLeft:                      '╮',
+	linkUp | linkLeft:                        '╯',
 	linkUp | linkRight | linkDown:            '┣',
 	linkRight | linkDown | linkLeft:          '┳',
 	linkUp | linkDown | linkLeft:             '┫',
@@ -100,7 +100,7 @@ func (c canvas) paintWall(p maze.Point) {
 
 // wallColor keeps the classic saturated blue maze walls.
 func (c canvas) wallColor(p maze.Point) rgb {
-	return rgb{35, 75, 255}
+	return rgb{70, 110, 255}
 }
 
 func (c canvas) paintFloor(p maze.Point) {
@@ -114,10 +114,6 @@ func (c canvas) paintFloor(p maze.Point) {
 		glyph, color := nectar(tick, lightAt(c.g, p))
 		style := color.fg().Bold(true)
 		c.f.set(x, y, glyph, style)
-		if c.scale.large {
-			c.f.set(x-1, y, '(', style)
-			c.f.set(x+1, y, ')', style)
-		}
 	default:
 		if age, visited := c.g.TicksSinceVisit(p); visited && age < trailLength {
 			glyph, color := trailSpark(age)
@@ -138,6 +134,9 @@ func cellHash(p maze.Point) uint32 {
 }
 
 func spark(p maze.Point, tick int, light float64, large bool) (rune, rgb) {
+	if (cellHash(p)+uint32(tick/twinklePhaseTicks))%twinklePeriod == 0 {
+		return twinkleGlyph, sparkLit
+	}
 	return sparkGlyph, sparkLit
 }
 
@@ -151,6 +150,9 @@ func trailSpark(age int) (rune, rgb) {
 
 // nectar always stands out, unlike sparks, because the firefly's life depends on it.
 func nectar(tick int, light float64) (rune, rgb) {
+	if (tick/nectarBloomTicks)%2 == 1 {
+		return nectarAltGlyph, nectarLit
+	}
 	return nectarGlyph, nectarLit
 }
 
@@ -195,7 +197,7 @@ func statusFooter(g *game.Game) string {
 	case g.Caught:
 		return "CAUGHT"
 	case g.SparksLeft() == 0:
-		return "NIVEL COMPLETADO"
+		return "MAZE CLEARED  ·  nuevo nivel"
 	case g.GlowTicks() > 0:
 		return "PODER ACTIVO  ·  " + controls
 	default:

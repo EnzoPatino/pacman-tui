@@ -23,7 +23,7 @@ const (
 	wideStatusColumns = 90
 	statusBarWidth    = 20
 
-	ambientLight  = 1.0
+	ambientLight  = 0.72
 	lightRadius   = 10.0
 	glowRadius    = 17.0
 	lightLevels   = 6.0
@@ -190,7 +190,11 @@ func (c canvas) statusLine() []segment {
 	muted := mutedColor.fg()
 	value := titleColor.fg().Bold(true)
 	wide := c.f.w >= wideStatusColumns
-	status := []segment{{"1UP ", muted}, {fmt.Sprintf("%06d", c.g.Score()), value}}
+	label := "1UP "
+	if !wide {
+		label = "SCORE "
+	}
+	status := []segment{{label, muted}, {fmt.Sprintf("%06d", c.g.Score()), value}}
 	if wide {
 		status = append(status, segment{"   HI ", muted}, segment{fmt.Sprintf("%06d", c.g.HighScore()), value})
 	}
@@ -216,7 +220,7 @@ func (c canvas) paintBanner() {
 	case c.g.GameOver():
 		text = "G A M E   O V E R"
 	case c.g.Ready():
-		text = fmt.Sprintf("READY!   LEVEL %d", c.g.Level())
+		text = fmt.Sprintf("READY!   L E V E L   %d", c.g.Level())
 	default:
 		return
 	}
