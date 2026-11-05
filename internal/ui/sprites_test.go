@@ -56,17 +56,17 @@ func TestSpritesHaveTheSizeTheirScaleLeavesRoomFor(t *testing.T) {
 	}
 }
 
-func TestFireflyLanternMovesTowardItsHeading(t *testing.T) {
-	want := map[maze.Dir][2]int{
+func TestPacmanMouthFacesItsHeading(t *testing.T) {
+	mouth := map[maze.Dir][2]int{
 		maze.Up:    {0, 2},
-		maze.Right: {1, 3},
+		maze.Right: {1, 4},
 		maze.Down:  {2, 2},
-		maze.Left:  {1, 1},
+		maze.Left:  {1, 0},
 	}
-	for dir, cell := range want {
+	for dir, cell := range mouth {
 		s := fireflySprite(dir, 0, true)
-		if got := []rune(s.rows[cell[0]])[cell[1]]; got != fireflyGlyph {
-			t.Errorf("heading %v: got %q at %v, want the lantern", dir, got, cell)
+		if got := []rune(s.mask[cell[0]])[cell[1]]; got != ' ' {
+			t.Errorf("heading %v: mouth cell %v is filled", dir, cell)
 		}
 	}
 }
@@ -76,7 +76,7 @@ func TestSpritesAnimate(t *testing.T) {
 	if robotSprite(face, 0, true).rows[1] == robotSprite(face, legPhaseTicks, true).rows[1] {
 		t.Error("robot arms do not move")
 	}
-	if fireflySprite(maze.Left, 0, true).rows[1] == fireflySprite(maze.Left, wingPhaseTicks, true).rows[1] {
-		t.Error("firefly wings do not beat")
+	if fireflySprite(maze.Left, 0, true).mask[1] == fireflySprite(maze.Left, 2, true).mask[1] {
+		t.Error("Pac-Man's mouth does not open and close")
 	}
 }

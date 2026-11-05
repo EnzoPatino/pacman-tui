@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	fireflyGlyph = 'C'
+	fireflyGlyph = '◕'
 
 	legPhaseTicks  = 2 // ticks between leg positions
 	wingPhaseTicks = 1 // ticks between wing beats
@@ -149,25 +149,36 @@ func robotSprite(face pair, tick int, large bool) sprite {
 
 // fireflySprite draws Pac-Man as a round, open mouth facing the direction of travel.
 func fireflySprite(heading maze.Dir, tick int, large bool) sprite {
-	mouth := fireflyGlyph
-	if tick%2 == 1 {
-		mouth = 'c'
-	}
-	if !large {
-		return sprite{rows: []string{" " + string(mouth) + " "}, mask: []string{"   "}}
-	}
-	rows := [3][]rune{[]rune("     "), []rune("     "), []rune("     ")}
-	mask := [3][]rune{[]rune("     "), []rune("     "), []rune("     ")}
-	// A five by three yellow disk with a wedge cut toward the direction of travel.
-	// Background-colored cells make the Pac-Man silhouette legible in any font.
-	shape := [3]string{" bbb ", "bb   ", " bbb "} // mouth opens right
+	openGlyph := fireflyGlyph
 	switch heading {
 	case maze.Left:
-		shape[1] = "   bb"
+		openGlyph = '◔'
 	case maze.Up:
-		shape = [3]string{"bb bb", "bbbbb", " bbb "}
+		openGlyph = '◒'
 	case maze.Down:
-		shape = [3]string{" bbb ", "bbbbb", "bb bb"}
+		openGlyph = '◓'
+	}
+	closed := (tick/2)%2 == 1
+	if !large {
+		glyph := openGlyph
+		if closed {
+			glyph = '●'
+		}
+		return sprite{rows: []string{" " + string(glyph) + " "}, mask: []string{"   "}}
+	}
+	mask := [3][]rune{[]rune("     "), []rune("     "), []rune("     ")}
+	shape := [3]string{" bbb ", "bb   ", " bbb "} // mouth opens right
+	if !closed {
+		switch heading {
+		case maze.Left:
+			shape[1] = "   bb"
+		case maze.Up:
+			shape = [3]string{"bb bb", "bbbbb", " bbb "}
+		case maze.Down:
+			shape = [3]string{" bbb ", "bbbbb", "bb bb"}
+		}
+	} else {
+		shape = [3]string{" bbb ", "bbbbb", " bbb "}
 	}
 	for y, row := range shape {
 		for x, cell := range row {
@@ -176,24 +187,9 @@ func fireflySprite(heading maze.Dir, tick int, large bool) sprite {
 			}
 		}
 	}
-	rowIndex, col := lanternCell(heading)
-	rows[rowIndex][col] = mouth
 	return sprite{
-		rows: []string{string(rows[0]), string(rows[1]), string(rows[2])},
+		rows: []string{"     ", "     ", "     "},
 		mask: []string{string(mask[0]), string(mask[1]), string(mask[2])},
-	}
-}
-
-func lanternCell(heading maze.Dir) (row, col int) {
-	switch heading {
-	case maze.Up:
-		return 0, 2
-	case maze.Right:
-		return 1, 3
-	case maze.Down:
-		return 2, 2
-	default:
-		return 1, 1
 	}
 }
 

@@ -152,7 +152,7 @@ func TestNarrowestTerminalShowsTheGame(t *testing.T) {
 		t.Fatal("no game at the minimum size")
 	}
 	newRenderer(screen).draw(g)
-	if !containsText(screen, "SCORE") || !strings.ContainsRune(screenText(screen), fireflyGlyph) {
+	if !containsText(screen, "SCORE") || !strings.ContainsAny(screenText(screen), "◕◔◒◓") {
 		t.Fatal("the header or the firefly is missing")
 	}
 }
@@ -213,7 +213,7 @@ func TestSmallTerminalShowsNoticeAndRecoversOnResize(t *testing.T) {
 		t.Fatal("no game after enlarging the terminal")
 	}
 	r.redraw(g)
-	if !strings.ContainsRune(screenText(screen), fireflyGlyph) {
+	if !strings.ContainsAny(screenText(screen), "◕◔◒◓") {
 		t.Fatal("firefly is not drawn after resizing")
 	}
 }
