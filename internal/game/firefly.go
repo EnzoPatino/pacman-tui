@@ -3,10 +3,10 @@ package game
 import "github.com/EnzoPatino/pacman-tui/internal/maze"
 
 const (
-	safetyMargin = 1  // extra steps the firefly wants over any spider
-	panicRange   = 7  // spider distance at which nectar becomes the priority
-	huntRange    = 12 // farthest scared spider worth chasing
-	boldAfter    = 60 // idle ticks after which the firefly stops avoiding spiders
+	safetyMargin = 1  // extra steps the firefly wants over any robot
+	panicRange   = 7  // robot distance at which nectar becomes the priority
+	huntRange    = 12 // farthest scared robot worth chasing
+	boldAfter    = 60 // idle ticks after which the firefly stops avoiding robots
 )
 
 func (g *Game) moveFirefly() {
@@ -19,7 +19,7 @@ func (g *Game) moveFirefly() {
 }
 
 // chooseFireflyDir picks the most urgent objective that can be reached without
-// a spider getting there first: eat scared spiders, grab nectar when threatened,
+// a robot getting there first: eat scared robots, grab nectar when threatened,
 // collect sparks. When no objective is safely reachable, the firefly flees. If
 // fleeing goes on for too long it takes the risk, so a round can never stall.
 func (g *Game) chooseFireflyDir() maze.Dir {
@@ -36,7 +36,7 @@ func (g *Game) chooseFireflyDir() maze.Dir {
 		huntable := func(p maze.Point, steps int) bool {
 			return steps <= min(huntRange, g.glowTicks) && safe(p, steps)
 		}
-		if dir, ok := g.Maze.FirstStepTo(g.Firefly, huntable, g.hasScaredSpider); ok {
+		if dir, ok := g.Maze.FirstStepTo(g.Firefly, huntable, g.hasScaredRobot); ok {
 			return dir
 		}
 	}
@@ -52,10 +52,10 @@ func (g *Game) chooseFireflyDir() maze.Dir {
 }
 
 // threatField returns the distance from every cell to the nearest dangerous
-// spider.
+// robot.
 func (g *Game) threatField() []int {
-	sources := make([]maze.Point, 0, len(g.Spiders))
-	for _, s := range g.Spiders {
+	sources := make([]maze.Point, 0, len(g.Robots))
+	for _, s := range g.Robots {
 		if !s.Scared {
 			sources = append(sources, s.Pos)
 		}
@@ -68,8 +68,8 @@ func (g *Game) isSafe(threat []int, p maze.Point, steps int) bool {
 	return d == maze.Unreachable || steps+safetyMargin < d
 }
 
-func (g *Game) hasScaredSpider(p maze.Point) bool {
-	for _, s := range g.Spiders {
+func (g *Game) hasScaredRobot(p maze.Point) bool {
+	for _, s := range g.Robots {
 		if s.Scared && s.Pos == p {
 			return true
 		}
@@ -81,7 +81,7 @@ func (g *Game) holds(item Item) func(maze.Point) bool {
 	return func(p maze.Point) bool { return g.ItemAt(p) == item }
 }
 
-// fleeDir moves away from the closest spider, preferring the least recently
+// fleeDir moves away from the closest robot, preferring the least recently
 // visited cell so the firefly does not shuttle between the same two cells.
 func (g *Game) fleeDir(threat []int) maze.Dir {
 	best, bestDanger, bestVisit := g.heading, -1, 0

@@ -9,17 +9,21 @@ import (
 const (
 	chaseDuration   = 200
 	scatterDuration = 70
-	releaseInterval = 20 // ticks between spiders leaving the den
+	releaseInterval = 20 // ticks between robots leaving the den
 	respawnDelay    = 30
 	ambushLead      = 4  // cells ahead of the firefly the ambusher aims for
-	spiderRestEvery = 10 // spiders skip one tick in this many, so the firefly is faster
-	scaredRestEvery = 2  // scared spiders move at half speed
+	robotRestEvery  = 10 // robots skip one tick in this many, so the firefly is faster
+	fastRestEvery   = 20 // the same from fastLevel on
+	fastLevel       = 3
+	scaredRestEvery = 2 // scared robots move at half speed
+
+	enragedSparkShare = 4 // robots stop resting when 1/this of the sparks remain
 )
 
-// Personality decides where a spider heads while hunting.
+// Personality decides where a robot heads while hunting.
 type Personality int
 
-// The spider personalities.
+// The robot personalities.
 const (
 	Hunter   Personality = iota // heads straight for the firefly
 	Ambusher                    // aims ahead of the firefly's path
@@ -28,8 +32,8 @@ const (
 
 var personalities = [...]Personality{Hunter, Ambusher, Drifter}
 
-// Spider is an enemy. Scared spiders flee erratically and can be eaten.
-type Spider struct {
+// Robot is an enemy. Scared robots flee erratically and can be eaten.
+type Robot struct {
 	Pos         maze.Point
 	Personality Personality
 	Scared      bool
@@ -38,46 +42,46 @@ type Spider struct {
 	waitTicks int
 }
 
-func newSpiders(den maze.Point, rng *rand.Rand) []*Spider {
-	spiders := make([]*Spider, len(personalities))
+func newRobots(den maze.Point, rng *rand.Rand) []*Robot {
+	robots := make([]*Robot, len(personalities))
 	for i, p := range personalities {
-		spiders[i] = &Spider{
+		robots[i] = &Robot{
 			Pos:         den,
 			Personality: p,
 			dir:         maze.Dirs[rng.IntN(len(maze.Dirs))],
 			waitTicks:   i * releaseInterval,
 		}
 	}
-	return spiders
+	return robots
 }
 
-func (s *Spider) sendHome(den maze.Point) {
+func (s *Robot) sendHome(den maze.Point) {
 	s.Pos = den
 	s.Scared = false
 	s.waitTicks = respawnDelay
 }
 
-func (g *Game) frightenSpiders() {
-	for _, s := range g.Spiders {
+func (g *Game) frightenRobots() {
+	for _, s := range g.Robots {
 		s.Scared = true
 		s.dir = s.dir.Opposite()
 	}
 }
 
-func (g *Game) calmSpiders() {
-	for _, s := range g.Spiders {
+func (g *Game) calmRobots() {
+	for _, s := range g.Robots {
 		s.Scared = false
 	}
 }
 
-func (g *Game) reverseSpiders() {
-	for _, s := range g.Spiders {
+func (g *Game) reverseRobots() {
+	for _, s := range g.Robots {
 		s.dir = s.dir.Opposite()
 	}
 }
 
-func (g *Game) moveSpiders() {
-	for _, s := range g.Spiders {
+func (g *Game) moveRobots() {
+	for _, s := range g.Robots {
 		if s.waitTicks > 0 {
 			s.waitTicks--
 			continue
@@ -85,23 +89,36 @@ func (g *Game) moveSpiders() {
 		if g.isResting(s) {
 			continue
 		}
-		s.dir = g.chooseSpiderDir(s)
+		s.dir = g.chooseRobotDir(s)
 		if next, ok := g.Maze.Step(s.Pos, s.dir); ok {
 			s.Pos = next
 		}
 	}
 }
 
-func (g *Game) isResting(s *Spider) bool {
+func (g *Game) isResting(s *Robot) bool {
 	if s.Scared {
 		return g.tick%scaredRestEvery == 0
 	}
-	return g.tick%spiderRestEvery == 0
+	every := g.robotRestInterval()
+	return every > 0 && g.tick%every == 0
 }
 
-// chooseSpiderDir never reverses unless it is the only way out; reversals
+// robotRestInterval makes robots faster as the game advances. It returns how
+// often they skip a tick, or zero when they never do, which is the firefly's speed.
+func (g *Game) robotRestInterval() int {
+	if g.sparksLeft*enragedSparkShare <= g.totalSparks {
+		return 0
+	}
+	if g.level >= fastLevel {
+		return fastRestEvery
+	}
+	return robotRestEvery
+}
+
+// chooseRobotDir never reverses unless it is the only way out; reversals
 // otherwise happen only on mode changes.
-func (g *Game) chooseSpiderDir(s *Spider) maze.Dir {
+func (g *Game) chooseRobotDir(s *Robot) maze.Dir {
 	options := make([]maze.Dir, 0, len(maze.Dirs))
 	for _, d := range g.Maze.Exits(s.Pos) {
 		if d != s.dir.Opposite() {
@@ -111,15 +128,15 @@ func (g *Game) chooseSpiderDir(s *Spider) maze.Dir {
 	if len(options) == 0 {
 		return s.dir.Opposite()
 	}
-	target, hasTarget := g.spiderTarget(s)
+	target, hasTarget := g.robotTarget(s)
 	if !hasTarget {
 		return options[g.rng.IntN(len(options))]
 	}
 	return g.closestOption(s.Pos, options, target)
 }
 
-// spiderTarget returns the cell a spider aims for, or false if it wanders.
-func (g *Game) spiderTarget(s *Spider) (maze.Point, bool) {
+// robotTarget returns the cell a robot aims for, or false if it wanders.
+func (g *Game) robotTarget(s *Robot) (maze.Point, bool) {
 	if s.Scared {
 		return maze.Point{}, false
 	}

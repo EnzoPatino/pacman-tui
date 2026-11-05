@@ -11,19 +11,62 @@ import (
 )
 
 const (
-	wallGlyph    = '▒'
-	sparkGlyph   = '·'
-	nectarGlyph  = '✿'
-	fireflyGlyph = '✦'
-	caughtGlyph  = '✕'
-	spiderGlyph  = 'ж'
+	hudRows    = 3 // title, status and a blank line
+	footerRows = 2 // a blank line and the footer
 
-	ambientLight  = 0.18
-	lightRadius   = 9.0
-	glowRadius    = 16.0
-	lightLevels   = 5.0
-	glowWarnTicks = 15 // scared spiders flicker when the glow is about to end
+	maxMazeWidth  = 81
+	maxMazeHeight = 41
+
+	titleRow  = 0
+	statusRow = 1
+
+	wideStatusColumns = 90
+	statusBarWidth    = 20
+
+	ambientLight  = 1.0
+	lightRadius   = 10.0
+	glowRadius    = 17.0
+	lightLevels   = 6.0
+	glowWarnTicks = 15 // scared robots flicker when the glow is about to end
 )
+
+// scale is how large the maze and its characters are drawn. Terminal cells are
+// about twice as tall as they are wide, so both scales look square.
+type scale struct {
+	cellW, cellH int
+	marginX      int // room for a sprite inside a side tunnel
+	large        bool
+}
+
+var (
+	largeScale = scale{cellW: 4, cellH: 2, marginX: 3, large: true}
+	smallScale = scale{cellW: 2, cellH: 1, marginX: 2}
+)
+
+// fit is a scale and the maze size that fills a terminal with it.
+type fit struct {
+	scale
+	mazeW, mazeH int
+}
+
+func (s scale) fitIn(columns, rows int) (fit, bool) {
+	drawableW := columns - 2*s.marginX - 1
+	drawableH := rows - hudRows - footerRows - 1
+	if drawableW < 0 || drawableH < 0 {
+		return fit{}, false
+	}
+	w := min(drawableW/s.cellW+1, maxMazeWidth)
+	h := min(drawableH/s.cellH+1, maxMazeHeight)
+	return fit{s, w, h}, w >= maze.MinWidth && h >= maze.MinHeight
+}
+
+// fitTerminal picks the largest scale at which a whole maze fits.
+func fitTerminal(columns, rows int) (fit, bool) {
+	if f, ok := largeScale.fitIn(columns, rows); ok {
+		return f, true
+	}
+	return smallScale.fitIn(columns, rows)
+}
 
 type rgb struct{ r, g, b float64 }
 
@@ -35,91 +78,172 @@ func (c rgb) mix(other rgb, amount float64) rgb {
 	}
 }
 
-func (c rgb) style() tcell.Style {
-	return tcell.StyleDefault.Foreground(tcell.NewRGBColor(int32(c.r), int32(c.g), int32(c.b)))
+func (c rgb) styleColor() tcell.Color {
+	return tcell.NewRGBColor(int32(c.r), int32(c.g), int32(c.b))
 }
 
-// The night-forest palette: objects are dim until the firefly's light hits them.
+func (c rgb) fg() tcell.Style {
+	return tcell.StyleDefault.Foreground(c.styleColor())
+}
+
+// The arcade palette uses blue walls, white dots, yellow power pellets and
+// distinct ghost colors.
 var (
-	mossDark    = rgb{38, 58, 48}
-	mossLit     = rgb{112, 190, 120}
-	sparkDark   = rgb{92, 86, 50}
-	sparkLit    = rgb{250, 225, 130}
-	nectarDark  = rgb{120, 62, 104}
-	nectarLit   = rgb{255, 140, 205}
-	fireflyBody = rgb{214, 255, 110}
-	fireflyGlow = rgb{255, 255, 225}
-	caughtColor = rgb{255, 90, 80}
-	scaredColor = rgb{140, 190, 255}
-	warnColor   = rgb{235, 240, 255}
+	black       = rgb{0, 0, 0}
+	neonMagenta = rgb{35, 75, 255}
+	neonViolet  = rgb{35, 75, 255}
+	sparkDim    = rgb{245, 245, 245}
+	sparkLit    = rgb{255, 255, 255}
+	nectarDim   = rgb{255, 200, 30}
+	nectarLit   = rgb{255, 225, 45}
+	denPattern  = rgb{35, 75, 255}
+	fireflyBody = rgb{255, 220, 0}
+	fireflyGlow = rgb{255, 235, 40}
+	caughtColor = rgb{255, 220, 0}
+	scaredColor = rgb{35, 90, 255}
+	warnColor   = rgb{255, 255, 255}
+	mutedColor  = rgb{185, 185, 185}
+	titleColor  = rgb{255, 220, 0}
+	barSparks   = rgb{255, 255, 255}
+	barGlow     = rgb{35, 90, 255}
+	barEmpty    = rgb{70, 70, 70}
 )
 
-var spiderColors = map[game.Personality]rgb{
-	game.Hunter:   {238, 86, 86},
-	game.Ambusher: {188, 128, 255},
-	game.Drifter:  {255, 158, 72},
+var robotColors = map[game.Personality]rgb{
+	game.Hunter:   {255, 35, 35},
+	game.Ambusher: {255, 150, 205},
+	game.Drifter:  {0, 230, 255},
 }
 
-func draw(screen tcell.Screen, g *game.Game) {
-	screen.Clear()
+// renderer draws frames and sends only what changed to the screen.
+type renderer struct {
+	screen  tcell.Screen
+	current frame
+	shown   frame
+}
+
+func newRenderer(screen tcell.Screen) *renderer { return &renderer{screen: screen} }
+
+// redraw repaints a screen whose layout changed, leaving nothing of the old one.
+func (r *renderer) redraw(g *game.Game) {
+	r.shown = frame{}
+	r.draw(g)
+	r.screen.Sync()
+}
+
+func (r *renderer) draw(g *game.Game) {
+	columns, rows := r.screen.Size()
+	r.current.reset(columns, rows)
 	if g == nil {
-		drawTooSmallNotice(screen)
+		paintTooSmallNotice(&r.current)
 	} else {
-		drawGame(screen, g)
+		paintGame(&r.current, g)
 	}
-	screen.Show()
+	r.flush()
+	r.screen.Show()
 }
 
-func drawTooSmallNotice(screen tcell.Screen) {
-	columns, rows := screen.Size()
-	message := fmt.Sprintf("Terminal too small (need %dx%d)", maze.MinWidth*cellColumns, maze.MinHeight)
-	runes := []rune(message)
-	x := max((columns-len(runes))/2, 0)
-	for i, r := range runes {
-		screen.SetContent(x+i, rows/2, r, nil, tcell.StyleDefault)
+// flush avoids writing unchanged cells: tcell's own comparison is defeated by
+// clearing, and every write has a cost on a screensaver that runs for hours.
+func (r *renderer) flush() {
+	cur, prev := &r.current, &r.shown
+	sameSize := prev.w == cur.w && prev.h == cur.h && len(prev.cells) == len(cur.cells)
+	for i, cell := range cur.cells {
+		if !sameSize || cell != prev.cells[i] {
+			r.screen.SetContent(i%cur.w, i/cur.w, cell.r, nil, cell.style)
+		}
 	}
+	r.current, r.shown = r.shown, r.current
 }
 
-func drawGame(screen tcell.Screen, g *game.Game) {
-	columns, rows := screen.Size()
-	originX := (columns - g.Maze.W*cellColumns) / 2
-	originY := (rows - g.Maze.H) / 2
-	put := func(p maze.Point, glyph rune, style tcell.Style) {
-		screen.SetContent(originX+p.X*cellColumns, originY+p.Y, glyph, nil, style)
-	}
+func paintTooSmallNotice(f *frame) {
+	smallest := smallScale
+	minColumns := (maze.MinWidth-1)*smallest.cellW + 1 + 2*smallest.marginX
+	minRows := (maze.MinHeight-1)*smallest.cellH + 1 + hudRows + footerRows
+	message := fmt.Sprintf("Terminal too small (need at least %dx%d)", minColumns, minRows)
+	f.centered(f.h/2, segment{message, mutedColor.fg()})
+}
 
-	for y := range g.Maze.H {
-		for x := range g.Maze.W {
+func paintGame(f *frame, g *game.Game) {
+	fitted, _ := fitTerminal(f.w, f.h)
+	c := newCanvas(f, g, fitted.scale)
+	c.paintHeader()
+	c.paintMaze()
+	for _, s := range g.Robots {
+		c.paintRobot(s)
+	}
+	c.paintFirefly()
+	c.paintBanner()
+	f.centered(f.h-1, segment{statusFooter(g), mutedColor.fg()})
+}
+
+func (c canvas) paintHeader() {
+	titleStyle := titleColor.fg().Bold(true)
+	c.f.centered(titleRow, segment{"P A C - M A N", titleStyle})
+
+	c.f.centered(statusRow, c.statusLine()...)
+}
+
+// statusLine always shows the score and lives. Only wide terminals have
+// room for the high score and the progress bars.
+func (c canvas) statusLine() []segment {
+	muted := mutedColor.fg()
+	value := titleColor.fg().Bold(true)
+	wide := c.f.w >= wideStatusColumns
+	status := []segment{{"1UP ", muted}, {fmt.Sprintf("%06d", c.g.Score()), value}}
+	if wide {
+		status = append(status, segment{"   HI ", muted}, segment{fmt.Sprintf("%06d", c.g.HighScore()), value})
+	}
+	status = append(status,
+		segment{"   LIVES ", muted}, segment{repeatRune('●', c.g.Lives()), fireflyBody.fg().Bold(true)},
+	)
+	if !wide {
+		return status
+	}
+	status = append(status, segment{"   ", muted})
+	status = append(status, barSegments(c.g.SparkProgress(), statusBarWidth, barSparks)...)
+	if c.g.GlowTicks() > 0 {
+		status = append(status, segment{"   POWER ", muted})
+		status = append(status, barSegments(c.g.GlowFraction(), statusBarWidth/2, barGlow)...)
+	}
+	return status
+}
+
+// paintBanner announces a new level or the end of a game over the maze's center.
+func (c canvas) paintBanner() {
+	text := ""
+	switch {
+	case c.g.GameOver():
+		text = "G A M E   O V E R"
+	case c.g.Ready():
+		text = fmt.Sprintf("READY!   LEVEL %d", c.g.Level())
+	default:
+		return
+	}
+	_, row := c.position(maze.Point{X: 0, Y: c.g.Maze.H / 2})
+	style := tcell.StyleDefault.Background(spriteInk.styleColor()).Foreground(titleColor.styleColor()).Bold(true)
+	c.f.centered(row, segment{"   " + text + "   ", style})
+}
+
+func (c canvas) paintMaze() {
+	m := c.g.Maze
+	for y := range m.H {
+		for x := range m.W {
 			p := maze.Point{X: x, Y: y}
-			light := lightAt(g, p)
-			switch {
-			case g.Maze.IsWall(p):
-				style := mossDark.mix(mossLit, light).style()
-				put(p, wallGlyph, style)
-				screen.SetContent(originX+x*cellColumns+1, originY+y, wallGlyph, nil, style)
-			case g.ItemAt(p) == game.Spark:
-				put(p, sparkGlyph, sparkDark.mix(sparkLit, light).style())
-			case g.ItemAt(p) == game.Nectar:
-				put(p, nectarGlyph, nectarDark.mix(nectarLit, light).style())
+			if m.IsWall(p) {
+				c.paintWall(p)
+			} else {
+				c.paintFloor(p)
 			}
 		}
 	}
-	for _, s := range g.Spiders {
-		put(s.Pos, spiderGlyph, spiderColor(g, s).style().Bold(true))
-	}
-	if g.Caught {
-		put(g.Firefly, caughtGlyph, caughtColor.style().Bold(true))
-		return
-	}
-	body := fireflyBody
-	if g.GlowTicks() > 0 {
-		body = fireflyGlow
-	}
-	put(g.Firefly, fireflyGlyph, body.style().Bold(true))
 }
 
-// lightAt returns how strongly the firefly illuminates a cell, from 0 to 1.
+// lightAt returns how strongly the firefly brightens a cell, from 0 to 1.
 func lightAt(g *game.Game, p maze.Point) float64 {
+	if g.SparksLeft() == 0 {
+		return 1 // the whole maze flares up when it is cleared
+	}
 	radius := lightRadius
 	if g.GlowTicks() > 0 {
 		radius = glowRadius
@@ -132,9 +256,9 @@ func lightAt(g *game.Game, p maze.Point) float64 {
 	return math.Round(light*lightLevels) / lightLevels
 }
 
-func spiderColor(g *game.Game, s *game.Spider) rgb {
+func robotColor(g *game.Game, s *game.Robot) rgb {
 	if !s.Scared {
-		return spiderColors[s.Personality]
+		return robotColors[s.Personality]
 	}
 	if ticks := g.GlowTicks(); ticks < glowWarnTicks && ticks%4 < 2 {
 		return warnColor

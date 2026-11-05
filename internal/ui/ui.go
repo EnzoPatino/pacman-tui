@@ -10,15 +10,9 @@ import (
 	"github.com/gdamore/tcell/v2"
 
 	"github.com/EnzoPatino/pacman-tui/internal/game"
-	"github.com/EnzoPatino/pacman-tui/internal/maze"
 )
 
-const (
-	tickInterval = 100 * time.Millisecond
-	// cellColumns compensates for terminal cells being about twice as tall as
-	// they are wide, so that maze cells look square.
-	cellColumns = 2
-)
+const tickInterval = 140 * time.Millisecond
 
 // Run plays the simulation until the context ends or the user asks to quit.
 // Terminal state is restored before it returns.
@@ -46,8 +40,9 @@ func loop(ctx context.Context, screen tcell.Screen, rng *rand.Rand) {
 	ticker := time.NewTicker(tickInterval)
 	defer ticker.Stop()
 
+	r := newRenderer(screen)
 	g := newGameForScreen(screen, rng)
-	draw(screen, g)
+	r.draw(g)
 	for {
 		select {
 		case <-ctx.Done():
@@ -60,13 +55,12 @@ func loop(ctx context.Context, screen tcell.Screen, rng *rand.Rand) {
 				}
 			case *tcell.EventResize:
 				g = newGameForScreen(screen, rng)
-				screen.Sync()
-				draw(screen, g)
+				r.redraw(g)
 			}
 		case <-ticker.C:
 			if g != nil {
 				g.Step()
-				draw(screen, g)
+				r.draw(g)
 			}
 		}
 	}
@@ -76,11 +70,11 @@ func loop(ctx context.Context, screen tcell.Screen, rng *rand.Rand) {
 // terminal is smaller than the minimum supported size.
 func newGameForScreen(screen tcell.Screen, rng *rand.Rand) *game.Game {
 	columns, rows := screen.Size()
-	width := columns / cellColumns
-	if width < maze.MinWidth || rows < maze.MinHeight {
+	fit, ok := fitTerminal(columns, rows)
+	if !ok {
 		return nil
 	}
-	return game.New(width, rows, rng)
+	return game.New(fit.mazeW, fit.mazeH, rng)
 }
 
 func isQuitKey(ev *tcell.EventKey) bool {
