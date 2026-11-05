@@ -1,43 +1,46 @@
 <div align="center">
 
-# 🟡 PAC-MAN TUI
+# Pac-Man TUI
 
-### El clásico laberinto arcade, jugando solo en tu terminal.
+**Un laberinto arcade autónomo, directamente en tu terminal.**
 
-<p>
-  <img src="https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat-square&logo=go&logoColor=white" alt="Go 1.24 o superior">
-  <img src="https://img.shields.io/badge/render-tcell-3155C6?style=flat-square" alt="Interfaz de terminal con tcell">
-  <img src="https://img.shields.io/badge/modo-autónomo-FFD400?style=flat-square&labelColor=171717" alt="Juego autónomo">
-</p>
+[![Go](https://img.shields.io/badge/Go-1.24%2B-00ADD8?logo=go&logoColor=white)](https://go.dev/)
+[![Interfaz](https://img.shields.io/badge/interfaz-tcell-3155C6)](https://github.com/gdamore/tcell)
+[![Modo](https://img.shields.io/badge/modo-autónomo-F4D03F)](#características)
 
 </div>
 
-Pac-Man recorre laberintos generados en cada partida, recoge puntos y escapa de
-tres fantasmas con comportamientos distintos. Las píldoras de poder cambian la
-cacería: los fantasmas huyen y Pac-Man puede atraparlos.
+<p align="center">
+  <img src="assets/pacman-tui.png" alt="Pac-Man TUI ejecutándose en una terminal: laberinto azul, Pac-Man amarillo y fantasmas de colores" width="100%">
+</p>
 
-## Vista de terminal
+<p align="center"><em>Una partida en vivo: el laberinto y la persecución avanzan solos.</em></p>
 
-```text
-                         P A C - M A N
-              1UP  001850     HI  001850     LIVES  ● ● ●
+## Acerca del proyecto
 
-      ╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
-      ┃ ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ┃
-      ┃ ·  ╭━━━━╮ ·  ·  ╭━━━━━━━━╮ ·  ·  ·  ·  ·  ┃
-      ┃ ·  ╰━━━━╯ ·  ·  ╰━━━━━━━━╯ ·  ·  ·  ·  ·  ┃
-      ┃ ·  ·  ·  ·  ·  ·  ◕  ·  ·  ·  ·  ·  ·  ·  ┃
-      ┃ ·  ·  ·  ·  ·  ·  👻  ·  ·  ·  ·  ·  ·  ·  ┃
-      ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+Pac-Man TUI es una pequeña simulación arcade para terminal, escrita en Go. En
+cada ronda genera un laberinto nuevo: Pac-Man busca puntos mientras tres
+fantasmas lo persiguen, lo anticipan o recorren el mapa. Las píldoras de poder
+invierten la persecución por unos instantes.
 
-                    PAC-MAN  ·  q / esc para salir
-```
+Está pensada para dejarse correr como animación de escritorio en una terminal.
+Pac-Man juega de forma autónoma; no requiere controles de movimiento.
 
-*Esquema ilustrativo: cada partida genera un laberinto diferente.*
+## Características
 
-## Empezar
+- Laberintos procedurales con túneles laterales.
+- Tres comportamientos de fantasmas: persecución, emboscada y movimiento errático.
+- Píldoras de poder, vidas, puntaje, récord y avance de nivel.
+- Interfaz arcade con sprites animados y paredes azules.
+- Adaptación al tamaño de la terminal, incluidos los cambios de ventana.
+- Renderizado incremental para reducir el parpadeo y las escrituras.
 
-Necesitas Go 1.24 o superior y una terminal con soporte de color.
+## Requisitos
+
+- Go 1.24 o superior.
+- Una terminal compatible con UTF-8 y color.
+
+## Ejecución
 
 ```bash
 git clone https://github.com/EnzoPatino/pacman-tui.git
@@ -45,41 +48,31 @@ cd pacman-tui
 go run ./cmd/glimmer
 ```
 
-También puedes compilar un binario local:
+Para compilar un ejecutable local:
 
 ```bash
 go build -o pacman-tui ./cmd/glimmer
 ./pacman-tui
 ```
 
-Pulsa `q`, `Esc` o `Ctrl+C` para salir. La partida es una animación autónoma;
-no hace falta controlar a Pac-Man.
+## Controles
 
-## Qué incluye
+| Tecla | Acción |
+|:--|:--|
+| `q` | Salir |
+| `Esc` | Salir |
+| `Ctrl+C` | Salir |
 
-- **Laberintos nuevos** en cada ronda, con túneles laterales.
-- **Tres fantasmas** que persiguen, anticipan el recorrido o deambulan.
-- **Píldoras de poder** para cambiar el sentido de la cacería.
-- **Puntaje, vidas y niveles** en una interfaz inspirada en el arcade.
-- **Ajuste al tamaño de la terminal** y redibujado al cambiar sus dimensiones.
-- **Dibujo incremental** para actualizar solo las celdas que cambiaron.
+## Estructura
 
-## Proyecto
+| Directorio | Responsabilidad |
+|:--|:--|
+| `cmd/glimmer` | Inicio de la aplicación |
+| `internal/game` | Reglas, personajes y decisiones autónomas |
+| `internal/maze` | Generación y navegación del laberinto |
+| `internal/ui` | Sprites, interfaz y renderizado de terminal |
 
-```text
-cmd/glimmer/       Entrada del programa
-internal/game/     Simulación, movimiento y decisiones
-internal/maze/     Generación y recorrido del laberinto
-internal/ui/       Interfaz, sprites y renderizado
-```
+## Tecnologías
 
-## Tecnología
-
-Hecho en Go con [tcell](https://github.com/gdamore/tcell), una biblioteca para
-interfaces de terminal. No requiere navegador ni recursos gráficos externos.
-
----
-
-<div align="center">
-  <sub>Un pequeño homenaje al arcade que convirtió un laberinto en una persecución.</sub>
-</div>
+[Go](https://go.dev/) y [tcell](https://github.com/gdamore/tcell). Las
+dependencias se descargan automáticamente al ejecutar o compilar el proyecto.
